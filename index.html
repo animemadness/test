@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reia - MMO Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #181a18 0%, #2a2d2a 100%);
+            color: #fbfaf5;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            background: rgba(30, 32, 30, 0.9);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border: 2px solid #ffcf0b;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            color: #ffcf0b;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #d2bc8d;
+            font-size: 1.1em;
+        }
+
+        .game-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .game-canvas {
+            background: rgba(20, 22, 20, 0.8);
+            border: 2px solid #07263d;
+            border-radius: 8px;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            min-height: 300px;
+        }
+
+        .game-canvas canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .game-status {
+            background: rgba(7, 38, 61, 0.3);
+            border: 2px solid #1472ba;
+            border-radius: 8px;
+            padding: 20px;
+            color: #d2bc8d;
+        }
+
+        .status-item {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        .status-label {
+            font-weight: bold;
+            color: #1472ba;
+        }
+
+        .status-value {
+            color: #ffcf0b;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px;
+            background: #ffcf0b;
+            color: #181a18;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #ffd91f;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 207, 11, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .connection-status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .connected {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+
+        .disconnected {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+        }
+
+        .chat {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid #07263d;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .chat-messages {
+            height: 150px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .chat-message {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #1472ba;
+            padding-left: 10px;
+        }
+
+        .chat-input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input-group input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #1472ba;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fbfaf5;
+        }
+
+        .chat-input-group input::placeholder {
+            color: #888;
+        }
+
+        @media (max-width: 768px) {
+            .game-area {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .container {
+                padding: 15px;
+            }
+        }
+
+        .loading {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 REIA</h1>
+            <p>MMO Adventure Awaits</p>
+        </div>
+
+        <div class="connection-status disconnected" id="connectionStatus">
+            ⚫ Disconnected
+        </div>
+
+        <div class="game-area">
+            <div class="game-canvas">
+                <canvas id="gameCanvas"></canvas>
+            </div>
+
+            <div class="game-status">
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <h3>Player Stats</h3>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Username:</span>
+                    <span class="status-value" id="username">Guest</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Level:</span>
+                    <span class="status-value" id="level">1</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Health:</span>
+                    <span class="status-value" id="health">100/100</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Mana:</span>
+                    <span class="status-value" id="mana">50/50</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Experience:</span>
+                    <span class="status-value" id="experience">0/1000</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Gold:</span>
+                    <span class="status-value" id="gold">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="movePlayer('up')">⬆️ Move Up</button>
+            <button onclick="movePlayer('down')">⬇️ Move Down</button>
+            <button onclick="movePlayer('left')">⬅️ Move Left</button>
+            <button onclick="movePlayer('right')">➡️ Move Right</button>
+            <button onclick="performAction('attack')">⚔️ Attack</button>
+            <button onclick="performAction('heal')">🏥 Heal</button>
+            <button onclick="performAction('cast')">✨ Cast Spell</button>
+            <button onclick="connect()">🔌 Connect</button>
+        </div>
+
+        <div class="chat">
+            <h4 style="margin-bottom: 10px; color: #1472ba;">💬 Chat</h4>
+            <div class="chat-messages" id="chatMessages">
+                <div class="chat-message"><span style="color: #ffcf0b;">[System]</span> Welcome to Reia!</div>
+            </div>
+            <div class="chat-input-group">
+                <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="handleChatKeypress(event)">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game variables
+        let isConnected = false;
+        let playerX = 400;
+        let playerY = 300;
+        let playerStats = {
+            username: 'Guest',
+            level: 1,
+            health: 100,
+            maxHealth: 100,
+            mana: 50,
+            maxMana: 50,
+            experience: 0,
+            maxExperience: 1000,
+            gold: 0
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Draw game world
+        function drawGame() {
+            // Clear canvas
+            ctx.fillStyle = '#181a18';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw background grid
+            ctx.strokeStyle = 'rgba(255, 207, 11, 0.1)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Draw some enemies
+            drawEnemy(100, 100, 'Goblin');
+            drawEnemy(700, 150, 'Orc');
+            drawEnemy(150, 500, 'Skeleton');
+
+            // Draw player
+            drawPlayer();
+
+            // Draw UI on canvas
+            ctx.fillStyle = '#ffcf0b';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(`Position: (${Math.floor(playerX)}, ${Math.floor(playerY)})`, 10, 20);
+            ctx.fillText(`FPS: ${Math.floor(1000/16)}`, 10, 40);
+        }
+
+        function drawPlayer() {
+            // Player body
+            ctx.fillStyle = '#1472ba';
+            ctx.beginPath();
+            ctx.arc(playerX, playerY, 15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Player outline
+            ctx.strokeStyle = '#ffcf0b';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Player label
+            ctx.fillStyle = '#ffcf0b';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('YOU', playerX, playerY + 30);
+            ctx.textAlign = 'left';
+        }
+
+        function drawEnemy(x, y, name) {
+            // Enemy body
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fillRect(x - 15, y - 15, 30, 30);
+
+            // Enemy outline
+            ctx.strokeStyle = '#ffcf0b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x - 15, y - 15, 30, 30);
+
+            // Enemy label
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(name, x, y + 25);
+            ctx.textAlign = 'left';
+        }
+
+        // Player movement
+        function movePlayer(direction) {
+            const speed = 20;
+            switch(direction) {
+                case 'up': playerY = Math.max(20, playerY - speed); break;
+                case 'down': playerY = Math.min(canvas.height - 20, playerY + speed); break;
+                case 'left': playerX = Math.max(20, playerX - speed); break;
+                case 'right': playerX = Math.min(canvas.width - 20, playerX + speed); break;
+            }
+            addChatMessage('[You]', `Moved ${direction}!`);
+            drawGame();
+        }
+
+        // Actions
+        function performAction(action) {
+            switch(action) {
+                case 'attack':
+                    addChatMessage('[System]', '⚔️ You attacked! Damage: ' + Math.floor(Math.random() * 30 + 10));
+                    playerStats.experience += Math.floor(Math.random() * 50);
+                    break;
+                case 'heal':
+                    let healAmount = Math.min(30, playerStats.maxHealth - playerStats.health);
+                    playerStats.health += healAmount;
+                    addChatMessage('[System]', '🏥 You healed yourself for ' + healAmount + ' HP!');
+                    break;
+                case 'cast':
+                    addChatMessage('[System]', '✨ You cast a spell! Mana cost: 20');
+                    playerStats.mana = Math.max(0, playerStats.mana - 20);
+                    break;
+            }
+            updateStats();
+            drawGame();
+        }
+
+        // Connection
+        function connect() {
+            isConnected = !isConnected;
+            const statusEl = document.getElementById('connectionStatus');
+            if (isConnected) {
+                statusEl.textContent = '🟢 Connected to Reia Server';
+                statusEl.className = 'connection-status connected';
+                addChatMessage('[System]', 'Connected to server!');
+                playerStats.username = 'Player_' + Math.floor(Math.random() * 1000);
+            } else {
+                statusEl.textContent = '⚫ Disconnected';
+                statusEl.className = 'connection-status disconnected';
+                addChatMessage('[System]', 'Disconnected from server!');
+            }
+            updateStats();
+            drawGame();
+        }
+
+        // Chat
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (message) {
+                addChatMessage('[You]', message);
+                input.value = '';
+            }
+        }
+
+        function handleChatKeypress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function addChatMessage(sender, message) {
+            const chatMessages = document.getElementById('chatMessages');
+            const msgEl = document.createElement('div');
+            msgEl.className = 'chat-message';
+            msgEl.innerHTML = `<span style="color: #1472ba;">[${sender.replace(/[\[\]]/g, '')}]</span> ${message}`;
+            chatMessages.appendChild(msgEl);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Update stats display
+        function updateStats() {
+            document.getElementById('username').textContent = playerStats.username;
+            document.getElementById('level').textContent = playerStats.level;
+            document.getElementById('health').textContent = playerStats.health + '/' + playerStats.maxHealth;
+            document.getElementById('mana').textContent = playerStats.mana + '/' + playerStats.maxMana;
+            document.getElementById('experience').textContent = playerStats.experience + '/' + playerStats.maxExperience;
+            document.getElementById('gold').textContent = playerStats.gold;
+
+            // Level up check
+            if (playerStats.experience >= playerStats.maxExperience) {
+                playerStats.level++;
+                playerStats.experience = 0;
+                playerStats.maxExperience = playerStats.maxExperience + 500;
+                playerStats.maxHealth += 20;
+                playerStats.health = playerStats.maxHealth;
+                addChatMessage('[System]', '🎉 Level Up! You are now level ' + playerStats.level);
+            }
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            switch(e.key.toLowerCase()) {
+                case 'w': movePlayer('up'); break;
+                case 's': movePlayer('down'); break;
+                case 'a': movePlayer('left'); break;
+                case 'd': movePlayer('right'); break;
+            }
+        });
+
+        // Game loop
+        function gameLoop() {
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start game
+        updateStats();
+        gameLoop();
+        addChatMessage('[System]', 'Click "Connect" to join the server!');
+    </script>
+</body>
+</html>
