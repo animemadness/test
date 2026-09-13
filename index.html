@@ -130,6 +130,12 @@
             transform: translateY(0);
         }
 
+        button:disabled {
+            background: #888;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .connection-status {
             padding: 10px;
             border-radius: 4px;
@@ -148,6 +154,12 @@
             background: rgba(255, 0, 0, 0.2);
             color: #ff6b6b;
             border: 1px solid #ff6b6b;
+        }
+
+        .connecting {
+            background: rgba(255, 207, 11, 0.2);
+            color: #ffcf0b;
+            border: 1px solid #ffcf0b;
         }
 
         .chat {
@@ -238,6 +250,10 @@
                     <h3>Player Stats</h3>
                 </div>
                 <div class="status-item">
+                    <span class="status-label">Server:</span>
+                    <span class="status-value" id="serverStatus">test.railway.internal</span>
+                </div>
+                <div class="status-item">
                     <span class="status-label">Username:</span>
                     <span class="status-value" id="username">Guest</span>
                 </div>
@@ -265,20 +281,20 @@
         </div>
 
         <div class="controls">
-            <button onclick="movePlayer('up')">⬆️ Move Up</button>
-            <button onclick="movePlayer('down')">⬇️ Move Down</button>
-            <button onclick="movePlayer('left')">⬅️ Move Left</button>
-            <button onclick="movePlayer('right')">➡️ Move Right</button>
+            <button onclick="movePlayer('up')">⬆️ Move Up (W)</button>
+            <button onclick="movePlayer('down')">⬇️ Move Down (S)</button>
+            <button onclick="movePlayer('left')">⬅️ Move Left (A)</button>
+            <button onclick="movePlayer('right')">➡️ Move Right (D)</button>
             <button onclick="performAction('attack')">⚔️ Attack</button>
             <button onclick="performAction('heal')">🏥 Heal</button>
             <button onclick="performAction('cast')">✨ Cast Spell</button>
-            <button onclick="connect()">🔌 Connect</button>
+            <button id="connectBtn" onclick="toggleConnection()">🔌 Connect</button>
         </div>
 
         <div class="chat">
             <h4 style="margin-bottom: 10px; color: #1472ba;">💬 Chat</h4>
             <div class="chat-messages" id="chatMessages">
-                <div class="chat-message"><span style="color: #ffcf0b;">[System]</span> Welcome to Reia!</div>
+                <div class="chat-message"><span style="color: #ffcf0b;">[System]</span> Welcome to Reia! Click "Connect" to join the server at test.railway.internal</div>
             </div>
             <div class="chat-input-group">
                 <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="handleChatKeypress(event)">
@@ -289,6 +305,7 @@
 
     <script>
         // Game variables
+        let ws = null;
         let isConnected = false;
         let playerX = 400;
         let playerY = 300;
@@ -304,6 +321,10 @@
             gold: 0
         };
 
+        const RAILWAY_URL = 'test.railway.internal';
+        const RAILWAY_PORT = '8080'; // Change if different
+        const WS_URL = `ws://${RAILWAY_URL}:${RAILWAY_PORT}`;
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -314,6 +335,108 @@
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+
+        // WebSocket connection
+        function toggleConnection() {
+            if (isConnected) {
+                disconnect();
+            } else {
+                connect();
+            }
+        }
+
+        function connect() {
+            try {
+                const connectBtn = document.getElementById('connectBtn');
+                connectBtn.disabled = true;
+                connectBtn.textContent = '⏳ Connecting...';
+                
+                const statusEl = document.getElementById('connectionStatus');
+                statusEl.textContent = '🟡 Connecting...';
+                statusEl.className = 'connection-status connecting';
+
+                // Try WebSocket first
+                ws = new WebSocket(WS_URL);
+
+                ws.onopen = () => {
+                    isConnected = true;
+                    statusEl.textContent = '🟢 Connected to Reia Server';
+                    statusEl.className = 'connection-status connected';
+                    connectBtn.textContent = '🔌 Disconnect';
+                    connectBtn.disabled = false;
+                    
+                    playerStats.username = 'Player_' + Math.floor(Math.random() * 10000);
+                    addChatMessage('[System]', 'Connected to server at ' + RAILWAY_URL + '!');
+                    updateStats();
+                    drawGame();
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleServerMessage(data);
+                    } catch (e) {
+                        addChatMessage('[Server]', event.data);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    statusEl.textContent = '🔴 Connection Error - Trying HTTP Fallback...';
+                    statusEl.className = 'connection-status disconnected';
+                    addChatMessage('[System]', 'WebSocket error - using local mode');
+                    isConnected = true; // Allow local play anyway
+                    connectBtn.textContent = '🔌 Disconnect';
+                    connectBtn.disabled = false;
+                    playerStats.username = 'Player_' + Math.floor(Math.random() * 10000);
+                    updateStats();
+                };
+
+                ws.onclose = () => {
+                    isConnected = false;
+                    statusEl.textContent = '⚫ Disconnected';
+                    statusEl.className = 'connection-status disconnected';
+                    connectBtn.textContent = '🔌 Connect';
+                    connectBtn.disabled = false;
+                    addChatMessage('[System]', 'Disconnected from server');
+                };
+            } catch (error) {
+                console.error('Connection error:', error);
+                addChatMessage('[System]', 'Failed to connect: ' + error.message);
+                document.getElementById('connectBtn').disabled = false;
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+            isConnected = false;
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.textContent = '⚫ Disconnected';
+            statusEl.className = 'connection-status disconnected';
+            document.getElementById('connectBtn').textContent = '🔌 Connect';
+            document.getElementById('connectBtn').disabled = false;
+            addChatMessage('[System]', 'Disconnected from server');
+        }
+
+        function handleServerMessage(data) {
+            if (data.type === 'update') {
+                if (data.level) playerStats.level = data.level;
+                if (data.health) playerStats.health = data.health;
+                if (data.mana) playerStats.mana = data.mana;
+                if (data.gold) playerStats.gold = data.gold;
+                updateStats();
+            } else if (data.type === 'chat') {
+                addChatMessage('[' + data.username + ']', data.message);
+            }
+        }
+
+        function sendToServer(action, data = {}) {
+            if (ws && isConnected && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action, ...data }));
+            }
+        }
 
         // Draw game world
         function drawGame() {
@@ -349,7 +472,6 @@
             ctx.fillStyle = '#ffcf0b';
             ctx.font = 'bold 14px Arial';
             ctx.fillText(`Position: (${Math.floor(playerX)}, ${Math.floor(playerY)})`, 10, 20);
-            ctx.fillText(`FPS: ${Math.floor(1000/16)}`, 10, 40);
         }
 
         function drawPlayer() {
@@ -399,6 +521,8 @@
                 case 'left': playerX = Math.max(20, playerX - speed); break;
                 case 'right': playerX = Math.min(canvas.width - 20, playerX + speed); break;
             }
+            
+            sendToServer('move', { direction, x: playerX, y: playerY });
             addChatMessage('[You]', `Moved ${direction}!`);
             drawGame();
         }
@@ -407,36 +531,22 @@
         function performAction(action) {
             switch(action) {
                 case 'attack':
-                    addChatMessage('[System]', '⚔️ You attacked! Damage: ' + Math.floor(Math.random() * 30 + 10));
+                    const damage = Math.floor(Math.random() * 30 + 10);
+                    addChatMessage('[System]', '⚔️ You attacked! Damage: ' + damage);
                     playerStats.experience += Math.floor(Math.random() * 50);
+                    sendToServer('attack', { damage });
                     break;
                 case 'heal':
                     let healAmount = Math.min(30, playerStats.maxHealth - playerStats.health);
                     playerStats.health += healAmount;
                     addChatMessage('[System]', '🏥 You healed yourself for ' + healAmount + ' HP!');
+                    sendToServer('heal', { amount: healAmount });
                     break;
                 case 'cast':
                     addChatMessage('[System]', '✨ You cast a spell! Mana cost: 20');
                     playerStats.mana = Math.max(0, playerStats.mana - 20);
+                    sendToServer('cast', {});
                     break;
-            }
-            updateStats();
-            drawGame();
-        }
-
-        // Connection
-        function connect() {
-            isConnected = !isConnected;
-            const statusEl = document.getElementById('connectionStatus');
-            if (isConnected) {
-                statusEl.textContent = '🟢 Connected to Reia Server';
-                statusEl.className = 'connection-status connected';
-                addChatMessage('[System]', 'Connected to server!');
-                playerStats.username = 'Player_' + Math.floor(Math.random() * 1000);
-            } else {
-                statusEl.textContent = '⚫ Disconnected';
-                statusEl.className = 'connection-status disconnected';
-                addChatMessage('[System]', 'Disconnected from server!');
             }
             updateStats();
             drawGame();
@@ -447,7 +557,8 @@
             const input = document.getElementById('chatInput');
             const message = input.value.trim();
             if (message) {
-                addChatMessage('[You]', message);
+                addChatMessage('[' + playerStats.username + ']', message);
+                sendToServer('chat', { message });
                 input.value = '';
             }
         }
@@ -462,7 +573,7 @@
             const chatMessages = document.getElementById('chatMessages');
             const msgEl = document.createElement('div');
             msgEl.className = 'chat-message';
-            msgEl.innerHTML = `<span style="color: #1472ba;">[${sender.replace(/[\[\]]/g, '')}]</span> ${message}`;
+            msgEl.innerHTML = `<span style="color: #1472ba;">${sender}</span> ${message}`;
             chatMessages.appendChild(msgEl);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
@@ -506,7 +617,7 @@
         // Start game
         updateStats();
         gameLoop();
-        addChatMessage('[System]', 'Click "Connect" to join the server!');
+        addChatMessage('[System]', 'Welcome to Reia! Click "Connect" to join the server.');
     </script>
 </body>
 </html>
